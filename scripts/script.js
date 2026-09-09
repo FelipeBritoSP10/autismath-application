@@ -1,16 +1,28 @@
+/* ==========================================================================
+   CONFIGURAÇÃO DOS EXERCÍCIOS
+   ========================================================================== */
 const exercicios = [
-    { pergunta: "Quanto é 3 + 4?", resposta: 7, dica: "3 mais 4 é igual a 7" },
-    { pergunta: "Quanto é 2 + 2?", resposta: 4, dica: "2 mais 2 é igual a 4" },
-    { pergunta: "Quanto é 6 - 3?", resposta: 3, dica: "Pense em 6 e tire 3" },
-    { pergunta: "Quanto é 1 + 4?", resposta: 5, dica: "O resultado é 5" }
+    { pergunta: "Quanto é 3 + 4?", resposta: 7, tipo: "soma", dica: "3 mais 4 é igual a 7" },
+    { pergunta: "Quanto é 2 + 2?", resposta: 4, tipo: "soma", dica: "2 mais 2 é igual a 4" },
+    { 
+        pergunta: "Quanto é 6 - 3?", 
+        resposta: 3, 
+        tipo: "subtracao", 
+        inicial: 6, 
+        remover: 3, 
+        dica: "Selecione 6 blocos e depois retire 3" 
+    },
+    { pergunta: "Quanto é 1 + 4?", resposta: 5, tipo: "soma", dica: "O resultado é 5" }
 ];
 
+// Variáveis de Estado do Jogo
 let indiceAtual = 0;
 let somAtivo = true;
-let focoIndex = 0; // índice do bloco em foco (navegação por setas)
+let focoIndex = 0; // Índice do bloco em foco (navegação por setas do teclado)
 const COLUNAS = 4;
 const LINHAS = 3;
 
+// Elementos do DOM (Interface)
 const grid = document.getElementById("grid-simples");
 const instrucao = document.getElementById("instrucao");
 const feedback = document.getElementById("msg-feedback");
@@ -21,10 +33,10 @@ const modalParabens = document.getElementById("modal-parabens");
 const modalFase = document.getElementById("modal-fase");
 const modalFaseTitulo = document.getElementById("modal-fase-titulo");
 const modalOverlay = document.getElementById("modal-overlay");
-const btnExecutar = document.querySelector(".btn-executar");
 
-/* ===================== ÁUDIO ===================== */
-// Coloque os arquivos .mp3 dentro de uma pasta "audios" ao lado do index.html
+/* ==========================================================================
+   SISTEMA DE SOM
+   ========================================================================== */
 const sons = {
     tom: new Audio("./audios/tom.mp3"),
     erro: new Audio("./audios/erro.mp3"),
@@ -43,19 +55,19 @@ function tocarSom(nome) {
     const som = sons[nome];
     if (!som) return;
     som.currentTime = 0;
-    som.play().catch(() => { /* navegador pode bloquear antes da 1ª interação */ });
+    som.play().catch(() => {});
 }
 
-// Interrompe qualquer áudio que ainda esteja tocando (evita som de uma fase
-// vazar e brigar com o "parabéns" da fase seguinte)
 function pararTodosOsSons() {
     Object.values(sons).forEach(som => {
         som.pause();
         som.currentTime = 0;
     });
 }
-/* =================================================== */
 
+/* ==========================================================================
+   PERSISTÊNCIA E ESTATÍSTICAS (LocalStorage)
+   ========================================================================== */
 function registrarEvento(tipo, fase, status, detalhe) {
     const dados = JSON.parse(localStorage.getItem('autismath_stats') || '[]');
     dados.push({
@@ -68,8 +80,10 @@ function registrarEvento(tipo, fase, status, detalhe) {
     localStorage.setItem('autismath_stats', JSON.stringify(dados));
 }
 
+/* ==========================================================================
+   ATUALIZAÇÕES DA INTERFACE (UI)
+   ========================================================================== */
 function definirFeedback(texto, tipo) {
-    // tipo: 'neutro' | 'sucesso' | 'erro' | 'dica'
     feedback.innerText = texto;
     feedbackCard.classList.remove("sucesso", "erro", "dica");
     if (tipo && tipo !== "neutro") {
@@ -90,6 +104,9 @@ function atualizarFoco() {
     }
 }
 
+/* ==========================================================================
+   LÓGICA DO JOGO E INTERAÇÃO COM OS BLOCOS
+   ========================================================================== */
 function iniciarExercicio() {
     grid.innerHTML = "";
     const item = exercicios[indiceAtual];
@@ -101,69 +118,95 @@ function iniciarExercicio() {
     for (let i = 0; i < 12; i++) {
         const div = document.createElement("div");
         div.classList.add("bloco");
+
         div.onclick = () => {
             focoIndex = i;
             atualizarFoco();
-            alternarBloco(div, item.resposta);
+            alternarBloco(div, item);
         };
         grid.appendChild(div);
     }
     atualizarFoco();
 }
 
-function alternarBloco(div, correta) {
-    const jaSelecionados = document.querySelectorAll(".selecionado").length;
-
-    if (!div.classList.contains("selecionado") && jaSelecionados >= correta) {
-        pararTodosOsSons();
-        tocarSom("erro");
-        definirFeedback(`Opa! Você já tem ${correta}. Não precisa apertar mais!`, "erro");
-        div.classList.add("tremer");
-        setTimeout(() => div.classList.remove("tremer"), 300);
-        return;
-    }
-
+function alternarBloco(div, item) {
     pararTodosOsSons();
     tocarSom("tom");
-    div.classList.toggle("selecionado");
-    div.innerText = div.classList.contains("selecionado") ? "🤖" : "";
+
+    if (item.tipo === "subtracao") {
+        // Ciclo da Subtração: Vazio -> Selecionado (coloca o robô) -> Vazio (apaga imediatamente ao clicar de novo)
+        if (!div.classList.contains("selecionado")) {
+            div.classList.add("selecionado");
+            div.innerText = "🤖";
+        } else {
+            div.classList.remove("selecionado");
+            div.innerText = "";
+        }
+    } else {
+        // Lógica de Soma: Alterna livremente sem bloqueio preventivo
+        div.classList.toggle("selecionado");
+        div.innerText = div.classList.contains("selecionado") ? "🤖" : "";
+    }
     definirFeedback("Selecione os blocos e clique em Verificar!", "neutro");
 }
 
 function validar() {
-    const selecionados = document.querySelectorAll(".selecionado").length;
-    const correta = exercicios[indiceAtual].resposta;
+    const item = exercicios[indiceAtual];
 
-    if (selecionados === correta) {
-        pararTodosOsSons();
-        tocarSom("parabens");
-        tocarSom("estouro");
-        definirFeedback("🌟 Parabéns! Você acertou!", "sucesso");
-        registrarEvento('Matemática', indiceAtual + 1, 'Acerto', `Respondeu ${correta} corretamente`);
-        if (window.confetti) {
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    if (item.tipo === "subtracao") {
+        const selecionadosIniciais = document.querySelectorAll(".selecionado").length;
+        const restantesCorretos = selecionadosIniciais === item.resposta;
+
+        if (restantesCorretos) {
+            processarAcerto(item.resposta);
+            registrarEvento('Matemática', indiceAtual + 1, 'Acerto', `Subtração correta (${item.inicial} - ${item.remover})`);
+        } else {
+            pararTodosOsSons();
+            tocarSom("tenteNovamente");
+            definirFeedback(`Lembre-se: coloque ${item.inicial} blocos e depois retire ${item.remover}.`, "erro");
+            registrarEvento('Matemática', indiceAtual + 1, 'Erro', `Erro na subtração`);
         }
-
-        setTimeout(() => {
-            const faseConcluida = indiceAtual + 1;
-            indiceAtual++;
-            atualizarRodape();
-            if (indiceAtual < exercicios.length) {
-                mostrarModalFase(faseConcluida);
-            } else {
-                telaFinal();
-            }
-        }, 1200);
     } else {
-        pararTodosOsSons();
-        tocarSom("tenteNovamente");
-        definirFeedback("Tente contar novamente.", "erro");
-        registrarEvento('Matemática', indiceAtual + 1, 'Erro', `Selecionou ${selecionados} em vez de ${correta}`);
+        // Validação da Soma
+        const selecionados = document.querySelectorAll(".selecionado").length;
+        const correta = item.resposta;
+
+        if (selecionados === correta) {
+            processarAcerto(correta);
+            registrarEvento('Matemática', indiceAtual + 1, 'Acerto', `Respondeu ${correta} corretamente`);
+        } else {
+            pararTodosOsSons();
+            tocarSom("tenteNovamente");
+            definirFeedback("Tente contar novamente.", "erro");
+            registrarEvento('Matemática', indiceAtual + 1, 'Erro', `Selecionou ${selecionados} em vez de ${correta}`);
+        }
     }
 }
 
+function processarAcerto(correta) {
+    pararTodosOsSons();
+    tocarSom("parabens");
+    tocarSom("estouro");
+    definirFeedback("🌟 Parabéns! Você acertou!", "sucesso");
+    
+    if (window.confetti) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    }
+
+    setTimeout(() => {
+        const faseConcluida = indiceAtual + 1;
+        indiceAtual++;
+        atualizarRodape();
+        if (indiceAtual < exercicios.length) {
+            mostrarModalFase(faseConcluida);
+        } else {
+            telaFinal();
+        }
+    }, 1200);
+}
+
 function limpar() {
-    document.querySelectorAll(".bloco.selecionado").forEach(b => {
+    document.querySelectorAll(".bloco").forEach(b => {
         b.classList.remove("selecionado");
         b.innerText = "";
     });
@@ -174,6 +217,9 @@ function ajuda() {
     definirFeedback(`💡 ${exercicios[indiceAtual].dica}`, "dica");
 }
 
+/* ==========================================================================
+   MODAIS E NAVEGAÇÃO DE TELAS
+   ========================================================================== */
 function mostrarModalFase(numeroFaseConcluida) {
     modalFaseTitulo.innerText = `Fase ${numeroFaseConcluida} concluída!`;
     modalOverlay.style.display = "block";
@@ -210,7 +256,9 @@ function alternarSom() {
     document.getElementById("icone-som").innerText = somAtivo ? "volume_up" : "volume_off";
 }
 
-/* ============ Navegação por teclado (setas) ============ */
+/* ==========================================================================
+   NAVEGAÇÃO POR TECLADO (Acessibilidade via Setas e Enter/Espaço)
+   ========================================================================== */
 document.addEventListener("keydown", (e) => {
     const blocos = document.querySelectorAll(".bloco");
     if (!blocos.length) return;
@@ -253,6 +301,5 @@ document.addEventListener("keydown", (e) => {
     }
     atualizarFoco();
 });
-/* ========================================================= */
 
 iniciarExercicio();

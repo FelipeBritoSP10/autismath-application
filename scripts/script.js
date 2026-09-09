@@ -1,16 +1,60 @@
 const exercicios = [
-    { pergunta: "Preencha 5 blocos", resposta: 5, dica: "Selecione 5 quadradinhos" },
+    { pergunta: "Quanto é 3 + 4?", resposta: 7, dica: "3 mais 4 é igual a 7" },
     { pergunta: "Quanto é 2 + 2?", resposta: 4, dica: "2 mais 2 é igual a 4" },
     { pergunta: "Quanto é 6 - 3?", resposta: 3, dica: "Pense em 6 e tire 3" },
-    { pergunta: "Quanto é 1 + 4?", resposta: 5, dica: "O resultado é 5" },
-    { pergunta: "Quanto é 8 - 2?", resposta: 6, dica: "8 menos 2 sobra 6" }
+    { pergunta: "Quanto é 1 + 4?", resposta: 5, dica: "O resultado é 5" }
 ];
 
 let indiceAtual = 0;
+let somAtivo = true;
+let focoIndex = 0; // índice do bloco em foco (navegação por setas)
+const COLUNAS = 4;
+const LINHAS = 3;
+
 const grid = document.getElementById("grid-simples");
 const instrucao = document.getElementById("instrucao");
 const feedback = document.getElementById("msg-feedback");
-const btnCheck = document.querySelector(".btn-check");
+const feedbackCard = document.getElementById("feedback-card");
+const faseTexto = document.getElementById("fase-texto");
+const progressoTexto = document.getElementById("progresso-texto");
+const modalParabens = document.getElementById("modal-parabens");
+const modalFase = document.getElementById("modal-fase");
+const modalFaseTitulo = document.getElementById("modal-fase-titulo");
+const modalOverlay = document.getElementById("modal-overlay");
+const btnExecutar = document.querySelector(".btn-executar");
+
+/* ===================== ÁUDIO ===================== */
+// Coloque os arquivos .mp3 dentro de uma pasta "audios" ao lado do index.html
+const sons = {
+    tom: new Audio("./audios/tom.mp3"),
+    erro: new Audio("./audios/erro.mp3"),
+    parabens: new Audio("./audios/parabens.mp3"),
+    tenteNovamente: new Audio("./audios/tente_novamente.mp3"),
+    estouro: new Audio("./audios/estouro.mp3"),
+    vitoriaFinal: new Audio("./audios/vitoria_final.mp3"),
+    cima: new Audio("./audios/cima.mp3"),
+    baixo: new Audio("./audios/baixo.mp3"),
+    esquerda: new Audio("./audios/esquerda.mp3"),
+    direita: new Audio("./audios/direita.mp3")
+};
+
+function tocarSom(nome) {
+    if (!somAtivo) return;
+    const som = sons[nome];
+    if (!som) return;
+    som.currentTime = 0;
+    som.play().catch(() => { /* navegador pode bloquear antes da 1ª interação */ });
+}
+
+// Interrompe qualquer áudio que ainda esteja tocando (evita som de uma fase
+// vazar e brigar com o "parabéns" da fase seguinte)
+function pararTodosOsSons() {
+    Object.values(sons).forEach(som => {
+        som.pause();
+        som.currentTime = 0;
+    });
+}
+/* =================================================== */
 
 function registrarEvento(tipo, fase, status, detalhe) {
     const dados = JSON.parse(localStorage.getItem('autismath_stats') || '[]');
@@ -24,22 +68,66 @@ function registrarEvento(tipo, fase, status, detalhe) {
     localStorage.setItem('autismath_stats', JSON.stringify(dados));
 }
 
+function definirFeedback(texto, tipo) {
+    // tipo: 'neutro' | 'sucesso' | 'erro' | 'dica'
+    feedback.innerText = texto;
+    feedbackCard.classList.remove("sucesso", "erro", "dica");
+    if (tipo && tipo !== "neutro") {
+        feedbackCard.classList.add(tipo);
+    }
+}
+
+function atualizarRodape() {
+    faseTexto.innerText = `Fase ${indiceAtual + 1}`;
+    progressoTexto.innerText = `${indiceAtual} de ${exercicios.length}`;
+}
+
+function atualizarFoco() {
+    const blocos = document.querySelectorAll(".bloco");
+    blocos.forEach(b => b.classList.remove("foco"));
+    if (blocos[focoIndex]) {
+        blocos[focoIndex].classList.add("foco");
+    }
+}
+
 function iniciarExercicio() {
-    grid.innerHTML = ""; 
+    grid.innerHTML = "";
     const item = exercicios[indiceAtual];
     instrucao.innerText = item.pergunta;
-    btnCheck.innerHTML = '<span class="material-icons">check_circle</span> VERIFICAR';
-    btnCheck.onclick = validar;
-    
+    definirFeedback("Selecione os blocos e clique em Verificar!", "neutro");
+    atualizarRodape();
+    focoIndex = 0;
+
     for (let i = 0; i < 12; i++) {
         const div = document.createElement("div");
         div.classList.add("bloco");
         div.onclick = () => {
-            div.classList.toggle("selecionado");
-            feedback.innerText = ""; 
+            focoIndex = i;
+            atualizarFoco();
+            alternarBloco(div, item.resposta);
         };
         grid.appendChild(div);
     }
+    atualizarFoco();
+}
+
+function alternarBloco(div, correta) {
+    const jaSelecionados = document.querySelectorAll(".selecionado").length;
+
+    if (!div.classList.contains("selecionado") && jaSelecionados >= correta) {
+        pararTodosOsSons();
+        tocarSom("erro");
+        definirFeedback(`Opa! Você já tem ${correta}. Não precisa apertar mais!`, "erro");
+        div.classList.add("tremer");
+        setTimeout(() => div.classList.remove("tremer"), 300);
+        return;
+    }
+
+    pararTodosOsSons();
+    tocarSom("tom");
+    div.classList.toggle("selecionado");
+    div.innerText = div.classList.contains("selecionado") ? "🤖" : "";
+    definirFeedback("Selecione os blocos e clique em Verificar!", "neutro");
 }
 
 function validar() {
@@ -47,62 +135,124 @@ function validar() {
     const correta = exercicios[indiceAtual].resposta;
 
     if (selecionados === correta) {
-        feedback.style.color = "#4CAF50";
-        feedback.innerText = "🌟 Parabéns! Você acertou!";
-        
+        pararTodosOsSons();
+        tocarSom("parabens");
+        tocarSom("estouro");
+        definirFeedback("🌟 Parabéns! Você acertou!", "sucesso");
         registrarEvento('Matemática', indiceAtual + 1, 'Acerto', `Respondeu ${correta} corretamente`);
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        if (window.confetti) {
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
 
         setTimeout(() => {
+            const faseConcluida = indiceAtual + 1;
             indiceAtual++;
+            atualizarRodape();
             if (indiceAtual < exercicios.length) {
-                iniciarExercicio();
-                feedback.innerText = "";
+                mostrarModalFase(faseConcluida);
             } else {
                 telaFinal();
             }
-        }, 2000);
+        }, 1200);
     } else {
-        feedback.style.color = "#D32F2F";
-        feedback.innerText = "Tente contar novamente.";
+        pararTodosOsSons();
+        tocarSom("tenteNovamente");
+        definirFeedback("Tente contar novamente.", "erro");
         registrarEvento('Matemática', indiceAtual + 1, 'Erro', `Selecionou ${selecionados} em vez de ${correta}`);
     }
 }
 
-function telaFinal() {
-    instrucao.innerText = "🏆 Excelente Trabalho!";
-    grid.innerHTML = "";
-    feedback.innerText = "Você concluiu todos os desafios de Matemática!";
-    
-    // Transforma o botão principal em Próxima Etapa (Lógica)
-    btnCheck.innerHTML = '<span class="material-icons">psychology</span> IR PARA LÓGICA';
-    btnCheck.onclick = () => {
-        window.location.href = 'index2.html';
-    };
-
-    // Adiciona botão de ver resultados
-    const btnResult = document.createElement("button");
-    btnResult.className = "btn-secundario";
-    btnResult.style.marginTop = "10px";
-    btnResult.innerHTML = '<span class="material-icons">bar_chart</span> VER RESULTADOS';
-    btnResult.onclick = () => window.location.href = 'resul.html';
-    grid.appendChild(btnResult);
-}
-
-function reiniciar() {
-    indiceAtual = 0;
-    feedback.innerText = "";
-    iniciarExercicio();
-}
-
 function limpar() {
-    document.querySelectorAll(".bloco").forEach(b => b.classList.remove("selecionado"));
-    feedback.innerText = "";
+    document.querySelectorAll(".bloco.selecionado").forEach(b => {
+        b.classList.remove("selecionado");
+        b.innerText = "";
+    });
+    definirFeedback("Selecione os blocos e clique em Verificar!", "neutro");
 }
 
 function ajuda() {
-    feedback.style.color = "#2196F3";
-    feedback.innerText = `💡 ${exercicios[indiceAtual].dica}`;
+    definirFeedback(`💡 ${exercicios[indiceAtual].dica}`, "dica");
 }
+
+function mostrarModalFase(numeroFaseConcluida) {
+    modalFaseTitulo.innerText = `Fase ${numeroFaseConcluida} concluída!`;
+    modalOverlay.style.display = "block";
+    modalFase.style.display = "block";
+}
+
+function continuarFase() {
+    pararTodosOsSons();
+    modalFase.style.display = "none";
+    modalOverlay.style.display = "none";
+    iniciarExercicio();
+}
+
+function telaFinal() {
+    pararTodosOsSons();
+    tocarSom("vitoriaFinal");
+    modalOverlay.style.display = "block";
+    modalParabens.style.display = "block";
+    if (window.confetti) {
+        confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
+    }
+}
+
+function irParaLogica() {
+    window.location.href = 'index2.html';
+}
+
+function verResultados() {
+    window.location.href = 'resul.html';
+}
+
+function alternarSom() {
+    somAtivo = !somAtivo;
+    document.getElementById("icone-som").innerText = somAtivo ? "volume_up" : "volume_off";
+}
+
+/* ============ Navegação por teclado (setas) ============ */
+document.addEventListener("keydown", (e) => {
+    const blocos = document.querySelectorAll(".bloco");
+    if (!blocos.length) return;
+
+    const linhaAtual = Math.floor(focoIndex / COLUNAS);
+    const colunaAtual = focoIndex % COLUNAS;
+
+    switch (e.key) {
+        case "ArrowUp":
+            if (linhaAtual > 0) focoIndex -= COLUNAS;
+            pararTodosOsSons();
+            tocarSom("cima");
+            e.preventDefault();
+            break;
+        case "ArrowDown":
+            if (linhaAtual < LINHAS - 1) focoIndex += COLUNAS;
+            pararTodosOsSons();
+            tocarSom("baixo");
+            e.preventDefault();
+            break;
+        case "ArrowLeft":
+            if (colunaAtual > 0) focoIndex -= 1;
+            pararTodosOsSons();
+            tocarSom("esquerda");
+            e.preventDefault();
+            break;
+        case "ArrowRight":
+            if (colunaAtual < COLUNAS - 1) focoIndex += 1;
+            pararTodosOsSons();
+            tocarSom("direita");
+            e.preventDefault();
+            break;
+        case "Enter":
+        case " ":
+            blocos[focoIndex]?.click();
+            e.preventDefault();
+            break;
+        default:
+            return;
+    }
+    atualizarFoco();
+});
+/* ========================================================= */
 
 iniciarExercicio();

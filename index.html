@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AUTISMATH</title>
+  <title>AUTISMATH - Matemática</title>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles/style.css">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
+
 <body>
 
   <!-- Aviso de Orientação -->
@@ -17,31 +19,104 @@
     <p>Por favor, use a tela na horizontal (paisagem).</p>
   </div>
 
-  <div class="app-container">
-    <h1 id="instrucao">Preencha 5 blocos</h1>
+  <div class="app-wrapper">
 
-    <div id="grid-simples"></div>
-
-    <div class="feedback-area">
-      <p id="msg-feedback"></p>
+    <!-- Header -->
+    <div class="app-header">
+      <a class="btn-icon btn-home" href="index2.html" title="Voltar ao menu">
+        <span class="material-icons">home</span>
+      </a>
+      <div class="title-container">
+        <h1 id="instrucao">Preencha 5 blocos</h1>
+      </div>
+      <button class="btn-icon btn-sound" id="btn-sound" onclick="alternarSom()" title="Som">
+        <span class="material-icons" id="icone-som">volume_up</span>
+      </button>
     </div>
 
-    <div class="controles">
-      <button class="btn-check" onclick="validar()">
-        <span class="material-icons">check_circle</span> VERIFICAR
-      </button>
+    <!-- Corpo -->
+    <div class="main-content">
 
-      <div class="bento-botoes">
-        <button class="btn-secundario" onclick="limpar()">
-          <span class="material-icons">undo</span> Desfazer
-        </button>
-        <button class="btn-secundario btn-dica" onclick="ajuda()">
-          <span class="material-icons">lightbulb</span> Dica
-        </button>
+      <!-- Grid à esquerda -->
+      <div class="left-panel">
+        <div id="grid-simples"></div>
       </div>
+
+      <!-- Painel à direita -->
+      <div class="right-panel">
+
+        <div class="panel-section">
+          <h3>Como você está indo?</h3>
+          <div class="feedback-card" id="feedback-card">
+            <span class="mascote-mini">🤖</span>
+            <p id="msg-feedback">Selecione os blocos e clique em Verificar!</p>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>Ações</h3>
+          <div class="acoes-container">
+            <button class="btn-acao btn-desfazer" onclick="limpar()">
+              <span class="material-icons">undo</span> Desfazer
+            </button>
+            <button class="btn-acao btn-dica" onclick="ajuda()">
+              <span class="material-icons">lightbulb</span> Dica
+            </button>
+            <button class="btn-acao btn-executar" onclick="validar()">
+              <span class="material-icons">check_circle</span> VERIFICAR
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Rodapé -->
+    <div class="app-footer">
+      <div class="mascote-container">
+        <div class="mascote-img">🤖</div>
+        <div class="fase-box" id="fase-texto">Fase 1</div>
+      </div>
+      <div class="progresso-container">
+        <span class="material-icons estrela-preenchida">star</span>
+        <span id="progresso-texto">0 de 5</span>
+        <div id="estrelas-mini"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Fundo escurecido compartilhado pelos modais -->
+  <div class="modal-overlay" id="modal-overlay"></div>
+
+  <!-- Modal de Fase Concluída (aparece entre um exercício e outro) -->
+  <div class="modal-jogo modal-fase" id="modal-fase">
+    <div class="emoji-grande">🎉</div>
+    <h2 id="modal-fase-titulo">Fase 1 concluída!</h2>
+    <p>Prepare-se para o próximo desafio.</p>
+    <div class="modal-botoes">
+      <button class="btn-modal-principal" onclick="continuarFase()">
+        <span class="material-icons">arrow_forward</span> CONTINUAR
+      </button>
     </div>
   </div>
 
-<script src="./scripts/script.js"></script>
+  <!-- Modal de Parabéns (fim do jogo) -->
+  <div class="modal-jogo" id="modal-parabens">
+    <div class="emoji-grande">🏆</div>
+    <h2>Excelente Trabalho!</h2>
+    <p>Você concluiu todos os desafios de Matemática!</p>
+    <div class="modal-botoes">
+      <button class="btn-modal-principal" onclick="irParaLogica()">
+        <span class="material-icons">psychology</span> IR PARA LÓGICA
+      </button>
+      <button class="btn-modal-secundario" onclick="verResultados()">
+        <span class="material-icons">bar_chart</span> VER RESULTADOS
+      </button>
+    </div>
+  </div>
+
+  <script src="./scripts/script.js"></script>
 </body>
+
 </html>

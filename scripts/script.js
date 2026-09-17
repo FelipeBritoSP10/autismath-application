@@ -2,17 +2,33 @@
    CONFIGURAÇÃO DOS EXERCÍCIOS
    ========================================================================== */
 const exercicios = [
-    { pergunta: "Quanto é 3 + 4?", resposta: 7, tipo: "soma", dica: "3 mais 4 é igual a 7" },
-    { pergunta: "Quanto é 2 + 2?", resposta: 4, tipo: "soma", dica: "2 mais 2 é igual a 4" },
-    { 
-        pergunta: "Quanto é 6 - 3?", 
-        resposta: 3, 
-        tipo: "subtracao", 
-        inicial: 6, 
-        remover: 3, 
-        dica: "Selecione 6 blocos e depois retire 3" 
+    { pergunta: "Quanto é 3 + 4?", resposta: 7, tipo: "soma", dica: "3 mais 4 é igual a 7", audio: "q1.mp3" },
+    { pergunta: "Quanto é 2 + 2?", resposta: 4, tipo: "soma", dica: "2 mais 2 é igual a 4", audio: "q2.mp3" },
+    {
+        pergunta: "Quanto é 6 - 3?",
+        resposta: 3,
+        tipo: "subtracao",
+        inicial: 6,
+        remover: 3,
+        dica: "Selecione 6 blocos e depois retire 3",
+        audio: "q3.mp3"
     },
-    { pergunta: "Quanto é 1 + 4?", resposta: 5, tipo: "soma", dica: "O resultado é 5" }
+    { pergunta: "Quanto é 1 + 4?",
+     resposta: 5, 
+     tipo: "soma", 
+     
+     dica: "O resultado é 5", 
+     
+     audio: "q4.mp3" },
+    { 
+        pergunta: "Quanto é 8 - 2?", 
+        resposta: 6, 
+        tipo: "subtracao", 
+        inicial: 8, 
+        remover: 2, 
+        dica: "8 menos 2 sobra 6", 
+        audio: "q5.mp3" 
+    }
 ];
 
 // Variáveis de Estado do Jogo
@@ -50,12 +66,34 @@ const sons = {
     direita: new Audio("./audios/direita.mp3")
 };
 
+// Instâncias para os áudios dinâmicos (contagem e enunciados)
+const audioPergunta = new Audio();
+const audioContagem = new Audio();
+
 function tocarSom(nome) {
     if (!somAtivo) return;
     const som = sons[nome];
     if (!som) return;
     som.currentTime = 0;
-    som.play().catch(() => {});
+    som.play().catch(() => { });
+}
+
+function tocarAudioDinamico(instancia, caminho) {
+    if (!somAtivo) return;
+    instancia.pause();
+    instancia.currentTime = 0;
+    instancia.src = caminho;
+
+    return instancia.play().catch(err => {
+        console.warn("Navegador bloqueou a execução automática direta:", err);
+    });
+}
+
+function tocarPerguntaAtual() {
+    const item = exercicios[indiceAtual];
+    if (item && item.audio) {
+        tocarAudioDinamico(audioPergunta, `./audios/${item.audio}`);
+    }
 }
 
 function pararTodosOsSons() {
@@ -63,6 +101,10 @@ function pararTodosOsSons() {
         som.pause();
         som.currentTime = 0;
     });
+    audioPergunta.pause();
+    audioPergunta.currentTime = 0;
+    audioContagem.pause();
+    audioContagem.currentTime = 0;
 }
 
 /* ==========================================================================
@@ -115,6 +157,9 @@ function iniciarExercicio() {
     atualizarRodape();
     focoIndex = 0;
 
+    // Toca a pergunta ao iniciar a fase
+    tocarPerguntaAtual();
+
     for (let i = 0; i < 12; i++) {
         const div = document.createElement("div");
         div.classList.add("bloco");
@@ -131,22 +176,36 @@ function iniciarExercicio() {
 
 function alternarBloco(div, item) {
     pararTodosOsSons();
-    tocarSom("tom");
+
+    let foiSelecionado = false;
 
     if (item.tipo === "subtracao") {
-        // Ciclo da Subtração: Vazio -> Selecionado (coloca o robô) -> Vazio (apaga imediatamente ao clicar de novo)
         if (!div.classList.contains("selecionado")) {
             div.classList.add("selecionado");
             div.innerText = "🤖";
+            foiSelecionado = true;
         } else {
             div.classList.remove("selecionado");
             div.innerText = "";
+            foiSelecionado = false;
         }
     } else {
-        // Lógica de Soma: Alterna livremente sem bloqueio preventivo
         div.classList.toggle("selecionado");
-        div.innerText = div.classList.contains("selecionado") ? "🤖" : "";
+        foiSelecionado = div.classList.contains("selecionado");
+        div.innerText = foiSelecionado ? "🤖" : "";
     }
+
+    // Só toca o som de contagem se um bloco tiver sido ADICIONADO
+    if (foiSelecionado) {
+        const totalSelecionados = document.querySelectorAll(".selecionado").length;
+        if (totalSelecionados > 0 && totalSelecionados <= 12) {
+            tocarAudioDinamico(audioContagem, `./audios/${totalSelecionados}.mp3`);
+        } else {
+            tocarSom("tom");
+        }
+    }
+    // Ao apagar/desmarcar, não executa nenhum som (silêncio total)
+
     definirFeedback("Selecione os blocos e clique em Verificar!", "neutro");
 }
 
@@ -167,7 +226,6 @@ function validar() {
             registrarEvento('Matemática', indiceAtual + 1, 'Erro', `Erro na subtração`);
         }
     } else {
-        // Validação da Soma
         const selecionados = document.querySelectorAll(".selecionado").length;
         const correta = item.resposta;
 
@@ -188,7 +246,7 @@ function processarAcerto(correta) {
     tocarSom("parabens");
     tocarSom("estouro");
     definirFeedback("🌟 Parabéns! Você acertou!", "sucesso");
-    
+
     if (window.confetti) {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
@@ -206,6 +264,9 @@ function processarAcerto(correta) {
 }
 
 function limpar() {
+    // Apaga os blocos em total silêncio
+    pararTodosOsSons();
+
     document.querySelectorAll(".bloco").forEach(b => {
         b.classList.remove("selecionado");
         b.innerText = "";
@@ -253,7 +314,13 @@ function verResultados() {
 
 function alternarSom() {
     somAtivo = !somAtivo;
-    document.getElementById("icone-som").innerText = somAtivo ? "volume_up" : "volume_off";
+    const icone = document.getElementById("icone-som");
+    if (icone) icone.innerText = somAtivo ? "volume_up" : "volume_off";
+    if (!somAtivo) {
+        pararTodosOsSons();
+    } else {
+        tocarPerguntaAtual();
+    }
 }
 
 /* ==========================================================================
@@ -302,4 +369,14 @@ document.addEventListener("keydown", (e) => {
     atualizarFoco();
 });
 
-iniciarExercicio();
+/* ==========================================================================
+   INICIALIZAÇÃO DA APLICAÇÃO NO CARREGAMENTO DA PÁGINA
+   ========================================================================== */
+window.addEventListener("DOMContentLoaded", () => {
+    iniciarExercicio();
+});
+
+// Força a leitura do áudio da questão imediatamente ao carregar
+window.addEventListener("load", () => {
+    tocarPerguntaAtual();
+});
